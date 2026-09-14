@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 const BEST_KEY = 'football-keepup-best-v1'
 
-type GameState = 'ready' | 'playing' | 'over'
+type GameState = 'ready' | 'armed' | 'playing' | 'over'
 
 type Ball = {
   x: number
@@ -20,9 +20,13 @@ export default function App() {
 
   const stateRef = useRef<GameState>('ready')
   const scoreRef = useRef(0)
-  const bestRef = useRef(Number(localStorage.getItem(BEST_KEY) || 0))
 
-  // Initial ball is completely stationary
+  const bestRef = useRef(
+    Number(localStorage.getItem(BEST_KEY) || 0)
+  )
+
+  const mutedRef = useRef(true)
+
   const ballRef = useRef<Ball>({
     x: 0.5,
     y: 0.76,
@@ -39,16 +43,33 @@ export default function App() {
 
   const audioRef = useRef<AudioContext | null>(null)
 
+  // --------------------------------------------------
+  // STATE
+  // --------------------------------------------------
+
   useEffect(() => {
     stateRef.current = state
   }, [state])
 
+  useEffect(() => {
+    mutedRef.current = muted
+  }, [muted])
+
+  // --------------------------------------------------
+  // CANVAS RESIZE
+  // --------------------------------------------------
+
   const resizeCanvas = () => {
     const canvas = canvasRef.current
+
     if (!canvas) return
 
     const rect = canvas.getBoundingClientRect()
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+
+    const dpr = Math.min(
+      window.devicePixelRatio || 1,
+      2
+    )
 
     canvas.width = Math.round(rect.width * dpr)
     canvas.height = Math.round(rect.height * dpr)
@@ -56,11 +77,21 @@ export default function App() {
     const ctx = canvas.getContext('2d')
 
     if (ctx) {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.setTransform(
+        dpr,
+        0,
+        0,
+        dpr,
+        0,
+        0
+      )
     }
   }
 
-  // Put the ball back into the initial stationary position
+  // --------------------------------------------------
+  // RESET BALL
+  // --------------------------------------------------
+
   const resetBall = () => {
     ballRef.current = {
       x: 0.5,
@@ -72,7 +103,10 @@ export default function App() {
     }
   }
 
-  // Reset everything and stay on the READY screen
+  // --------------------------------------------------
+  // RESET EVERYTHING
+  // --------------------------------------------------
+
   const resetToReady = () => {
     scoreRef.current = 0
     setScore(0)
@@ -85,45 +119,79 @@ export default function App() {
     lastTimeRef.current = performance.now()
   }
 
+  // --------------------------------------------------
+  // AUDIO
+  // --------------------------------------------------
+
   const createAudio = () => {
-    if (muted) return
+    if (mutedRef.current) return
 
-    const AC = window.AudioContext || (window as any).webkitAudioContext
+    const AudioCtx =
+      window.AudioContext ||
+      (window as any).webkitAudioContext
 
-    if (!AC) return
+    if (!AudioCtx) return
 
     if (!audioRef.current) {
-      audioRef.current = new AC()
+      audioRef.current = new AudioCtx()
     }
 
-    if (audioRef.current.state === 'suspended') {
+    if (
+      audioRef.current.state ===
+      'suspended'
+    ) {
       audioRef.current.resume()
     }
   }
 
   const hitSound = () => {
-    if (muted || !audioRef.current) return
+    if (
+      mutedRef.current ||
+      !audioRef.current
+    ) {
+      return
+    }
 
     const ctx = audioRef.current
+
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
 
-    osc.frequency.value = 180 + Math.min(scoreRef.current * 3, 100)
+    osc.frequency.value =
+      180 +
+      Math.min(
+        scoreRef.current * 3,
+        100
+      )
 
-    gain.gain.setValueAtTime(0.05, ctx.currentTime)
+    gain.gain.setValueAtTime(
+      0.05,
+      ctx.currentTime
+    )
+
     gain.gain.exponentialRampToValueAtTime(
       0.001,
       ctx.currentTime + 0.08
     )
 
-    osc.connect(gain).connect(ctx.destination)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
 
     osc.start()
-    osc.stop(ctx.currentTime + 0.08)
+
+    osc.stop(
+      ctx.currentTime + 0.08
+    )
   }
 
-  // Kick the ball
-  const kickBall = (inputX?: number, countScore = true) => {
+  // --------------------------------------------------
+  // KICK BALL
+  // --------------------------------------------------
+
+  const kickBall = (
+    inputX?: number,
+    countScore = true
+  ) => {
     createAudio()
 
     const ball = ballRef.current
@@ -133,12 +201,18 @@ export default function App() {
 
     const width = canvas.clientWidth
 
-    const x = ball.x * width
-    const target = inputX ?? x
+    const currentX =
+      ball.x * width
+
+    const target =
+      inputX ?? currentX
 
     const horizontal = Math.max(
       -360,
-      Math.min(360, (target - x) * 2.2)
+      Math.min(
+        360,
+        (target - currentX) * 2.2
+      )
     )
 
     ball.vy = -820
@@ -146,15 +220,27 @@ export default function App() {
 
     if (countScore) {
       scoreRef.current += 1
-      setScore(scoreRef.current)
 
-      if (scoreRef.current > bestRef.current) {
-        bestRef.current = scoreRef.current
-        setBest(scoreRef.current)
+      setScore(
+        scoreRef.current
+      )
+
+      if (
+        scoreRef.current >
+        bestRef.current
+      ) {
+        bestRef.current =
+          scoreRef.current
+
+        setBest(
+          scoreRef.current
+        )
 
         localStorage.setItem(
           BEST_KEY,
-          String(scoreRef.current)
+          String(
+            scoreRef.current
+          )
         )
       }
 
@@ -162,36 +248,167 @@ export default function App() {
     }
   }
 
-  // Start a new game
-  // The important part: reset first, then immediately kick the ball.
-  const startGame = (inputX?: number) => {
+  // --------------------------------------------------
+  // PLAY BUTTON
+  //
+  // IMPORTANT:
+  // PLAY DOES NOT START THE GAME.
+  // It only arms the game.
+  // Ball remains completely stationary.
+  // --------------------------------------------------
+
+  const armGame = () => {
     scoreRef.current = 0
     setScore(0)
 
     resetBall()
 
+    stateRef.current = 'armed'
+    setState('armed')
+
+    lastTimeRef.current =
+      performance.now()
+  }
+
+  // --------------------------------------------------
+  // START GAME FROM BALL CLICK
+  // --------------------------------------------------
+
+  const startFromBall = () => {
+    resetBall()
+
     stateRef.current = 'playing'
     setState('playing')
 
-    lastTimeRef.current = performance.now()
+    lastTimeRef.current =
+      performance.now()
 
-    // First kick
-    kickBall(inputX, true)
+    // First kick does NOT add a point.
+    kickBall(undefined, false)
   }
 
-  const handleGameInput = (inputX?: number) => {
-    if (stateRef.current === 'ready') {
-      startGame(inputX)
+  // --------------------------------------------------
+  // BALL HIT DETECTION
+  // --------------------------------------------------
+
+  const isBallHit = (
+    clientX: number,
+    clientY: number
+  ) => {
+    const canvas = canvasRef.current
+
+    if (!canvas) return false
+
+    const rect =
+      canvas.getBoundingClientRect()
+
+    const ball =
+      ballRef.current
+
+    const ballX =
+      rect.left +
+      ball.x * rect.width
+
+    const ballY =
+      rect.top +
+      ball.y * rect.height
+
+    const dx =
+      clientX - ballX
+
+    const dy =
+      clientY - ballY
+
+    const distance =
+      Math.sqrt(
+        dx * dx +
+        dy * dy
+      )
+
+    // Slightly generous hit area
+    return (
+      distance <=
+      ball.radius + 25
+    )
+  }
+
+  // --------------------------------------------------
+  // POINTER INPUT
+  // --------------------------------------------------
+
+  const onPointerDown = (
+    e: React.PointerEvent<HTMLCanvasElement>
+  ) => {
+    e.preventDefault()
+
+    // ------------------------------------------
+    // BEFORE GAME START:
+    // Only clicking the actual ball starts game.
+    // ------------------------------------------
+
+    if (
+      stateRef.current === 'armed'
+    ) {
+      if (
+        isBallHit(
+          e.clientX,
+          e.clientY
+        )
+      ) {
+        startFromBall()
+      }
+
       return
     }
 
-    if (stateRef.current === 'over') {
-      startGame(inputX)
+    // ------------------------------------------
+    // READY SCREEN:
+    // Canvas itself does nothing.
+    // User must press PLAY button.
+    // ------------------------------------------
+
+    if (
+      stateRef.current === 'ready'
+    ) {
       return
     }
 
-    kickBall(inputX, true)
+    // ------------------------------------------
+    // GAME OVER:
+    // Canvas does nothing.
+    // PLAY AGAIN button starts armed mode.
+    // ------------------------------------------
+
+    if (
+      stateRef.current === 'over'
+    ) {
+      return
+    }
+
+    // ------------------------------------------
+    // PLAYING:
+    // Normal keep-up controls.
+    // ------------------------------------------
+
+    if (
+      stateRef.current === 'playing'
+    ) {
+      const rect =
+        e.currentTarget.getBoundingClientRect()
+
+      const inputX =
+        e.clientX - rect.left
+
+      kickBall(
+        inputX,
+        true
+      )
+    }
   }
+
+  // --------------------------------------------------
+  // DRAW BALL
+  // --------------------------------------------------
 
   const drawBall = (
     ctx: CanvasRenderingContext2D,
@@ -199,21 +416,35 @@ export default function App() {
     w: number,
     h: number
   ) => {
-    const x = b.x * w
-    const y = b.y * h
-    const r = b.radius
+    const x =
+      b.x * w
+
+    const y =
+      b.y * h
+
+    const r =
+      b.radius
 
     // Shadow
-    const shadowY = h * 0.9
+    const shadowY =
+      h * 0.9
 
-    const shadowScale = Math.max(
-      0.25,
-      1 - (Math.abs(y - shadowY) / h) * 1.7
-    )
+    const shadowScale =
+      Math.max(
+        0.25,
+        1 -
+          (Math.abs(
+            y - shadowY
+          ) /
+            h) *
+            1.7
+      )
 
     ctx.save()
 
-    ctx.globalAlpha = 0.22 * shadowScale
+    ctx.globalAlpha =
+      0.22 * shadowScale
+
     ctx.fillStyle = '#000'
 
     ctx.beginPath()
@@ -221,47 +452,82 @@ export default function App() {
     ctx.ellipse(
       x,
       shadowY,
-      r * 1.15 * shadowScale,
-      r * 0.28 * shadowScale,
+      r *
+        1.15 *
+        shadowScale,
+      r *
+        0.28 *
+        shadowScale,
       0,
       0,
       Math.PI * 2
     )
 
     ctx.fill()
+
     ctx.restore()
 
+    // Ball
     ctx.save()
 
-    ctx.translate(x, y)
-    ctx.rotate(b.rotation)
-
-    // Ball body
-    const gradient = ctx.createRadialGradient(
-      -r * 0.35,
-      -r * 0.45,
-      r * 0.08,
-      0,
-      0,
-      r
+    ctx.translate(
+      x,
+      y
     )
 
-    gradient.addColorStop(0, '#ffffff')
-    gradient.addColorStop(0.72, '#f2f4f7')
-    gradient.addColorStop(1, '#c8cdd4')
+    ctx.rotate(
+      b.rotation
+    )
 
-    ctx.fillStyle = gradient
+    const gradient =
+      ctx.createRadialGradient(
+        -r * 0.35,
+        -r * 0.45,
+        r * 0.08,
+        0,
+        0,
+        r
+      )
+
+    gradient.addColorStop(
+      0,
+      '#ffffff'
+    )
+
+    gradient.addColorStop(
+      0.72,
+      '#f2f4f7'
+    )
+
+    gradient.addColorStop(
+      1,
+      '#c8cdd4'
+    )
+
+    ctx.fillStyle =
+      gradient
 
     ctx.beginPath()
-    ctx.arc(0, 0, r, 0, Math.PI * 2)
+
+    ctx.arc(
+      0,
+      0,
+      r,
+      0,
+      Math.PI * 2
+    )
+
     ctx.fill()
 
     ctx.lineWidth = 2
-    ctx.strokeStyle = '#aeb4bd'
+    ctx.strokeStyle =
+      '#aeb4bd'
+
     ctx.stroke()
 
     // Football patches
-    ctx.fillStyle = '#171a1f'
+    ctx.fillStyle =
+      '#171a1f'
 
     const patch = (
       px: number,
@@ -270,18 +536,38 @@ export default function App() {
     ) => {
       ctx.beginPath()
 
-      for (let i = 0; i < 5; i++) {
-        const a =
+      for (
+        let i = 0;
+        i < 5;
+        i++
+      ) {
+        const angle =
           -Math.PI / 2 +
-          (i * Math.PI * 2) / 5
+          (i *
+            Math.PI *
+            2) /
+            5
 
-        const xx = px + Math.cos(a) * s
-        const yy = py + Math.sin(a) * s
+        const xx =
+          px +
+          Math.cos(angle) *
+            s
+
+        const yy =
+          py +
+          Math.sin(angle) *
+            s
 
         if (i === 0) {
-          ctx.moveTo(xx, yy)
+          ctx.moveTo(
+            xx,
+            yy
+          )
         } else {
-          ctx.lineTo(xx, yy)
+          ctx.lineTo(
+            xx,
+            yy
+          )
         }
       }
 
@@ -289,14 +575,40 @@ export default function App() {
       ctx.fill()
     }
 
-    patch(0, 0, r * 0.24)
-    patch(-r * 0.58, -r * 0.05, r * 0.12)
-    patch(r * 0.48, -r * 0.35, r * 0.12)
-    patch(r * 0.35, r * 0.55, r * 0.12)
-    patch(-r * 0.4, r * 0.52, r * 0.12)
+    patch(
+      0,
+      0,
+      r * 0.24
+    )
+
+    patch(
+      -r * 0.58,
+      -r * 0.05,
+      r * 0.12
+    )
+
+    patch(
+      r * 0.48,
+      -r * 0.35,
+      r * 0.12
+    )
+
+    patch(
+      r * 0.35,
+      r * 0.55,
+      r * 0.12
+    )
+
+    patch(
+      -r * 0.4,
+      r * 0.52,
+      r * 0.12
+    )
 
     // Ball lines
-    ctx.strokeStyle = '#333840'
+    ctx.strokeStyle =
+      '#333840'
+
     ctx.lineWidth = 3
 
     const line = (
@@ -306,8 +618,17 @@ export default function App() {
       y2: number
     ) => {
       ctx.beginPath()
-      ctx.moveTo(x1, y1)
-      ctx.lineTo(x2, y2)
+
+      ctx.moveTo(
+        x1,
+        y1
+      )
+
+      ctx.lineTo(
+        x2,
+        y2
+      )
+
       ctx.stroke()
     }
 
@@ -342,99 +663,195 @@ export default function App() {
     ctx.restore()
   }
 
-  const draw = (time: number) => {
-    const canvas = canvasRef.current
+  // --------------------------------------------------
+  // GAME LOOP
+  // --------------------------------------------------
+
+  const draw = (
+    time: number
+  ) => {
+    const canvas =
+      canvasRef.current
 
     if (!canvas) return
 
-    const ctx = canvas.getContext('2d')
+    const ctx =
+      canvas.getContext('2d')
 
     if (!ctx) return
 
-    const w = canvas.clientWidth
-    const h = canvas.clientHeight
+    const w =
+      canvas.clientWidth
 
-    ctx.clearRect(0, 0, w, h)
+    const h =
+      canvas.clientHeight
 
-    // Background
-    const bg = ctx.createLinearGradient(
+    ctx.clearRect(
       0,
       0,
-      0,
+      w,
       h
     )
 
-    bg.addColorStop(0, '#f7f8fa')
-    bg.addColorStop(1, '#dfe3e8')
+    // Background
+    const bg =
+      ctx.createLinearGradient(
+        0,
+        0,
+        0,
+        h
+      )
 
-    ctx.fillStyle = bg
-    ctx.fillRect(0, 0, w, h)
+    bg.addColorStop(
+      0,
+      '#f7f8fa'
+    )
 
-    // Subtle field lines
-    ctx.strokeStyle = 'rgba(70, 76, 84, .08)'
+    bg.addColorStop(
+      1,
+      '#dfe3e8'
+    )
+
+    ctx.fillStyle =
+      bg
+
+    ctx.fillRect(
+      0,
+      0,
+      w,
+      h
+    )
+
+    // Field lines
+    ctx.strokeStyle =
+      'rgba(70, 76, 84, .08)'
+
     ctx.lineWidth = 2
 
-    for (let i = 1; i < 9; i++) {
-      const yy = h * (i / 10)
+    for (
+      let i = 1;
+      i < 9;
+      i++
+    ) {
+      const yy =
+        h *
+        (i / 10)
 
       ctx.beginPath()
-      ctx.moveTo(0, yy)
-      ctx.lineTo(w, yy)
+
+      ctx.moveTo(
+        0,
+        yy
+      )
+
+      ctx.lineTo(
+        w,
+        yy
+      )
+
       ctx.stroke()
     }
 
-    const b = ballRef.current
+    const ball =
+      ballRef.current
 
-    // Calculate delta time
-    const dt = Math.min(
-      (time - lastTimeRef.current) / 1000,
-      0.033
-    )
+    const dt =
+      Math.min(
+        (time -
+          lastTimeRef.current) /
+          1000,
+        0.033
+      )
 
-    lastTimeRef.current = time
+    lastTimeRef.current =
+      time
 
-    // IMPORTANT:
-    // Physics only runs while PLAYING.
-    // During READY the ball stays completely still.
-    if (stateRef.current === 'playing') {
-      const gravity = 1850
+    // ------------------------------------------
+    // PHYSICS ONLY RUNS IN PLAYING
+    //
+    // READY = stationary
+    // ARMED = stationary
+    // OVER = stationary
+    // ------------------------------------------
 
-      b.vy += gravity * dt
+    if (
+      stateRef.current ===
+      'playing'
+    ) {
+      const gravity =
+        1850
 
-      b.x += (b.vx * dt) / w
-      b.y += (b.vy * dt) / h
+      ball.vy +=
+        gravity * dt
 
-      b.rotation += (b.vx * dt) / 160
+      ball.x +=
+        (ball.vx * dt) /
+        w
 
-      b.vx *= Math.pow(0.985, dt * 60)
+      ball.y +=
+        (ball.vy * dt) /
+        h
+
+      ball.rotation +=
+        (ball.vx * dt) /
+        160
+
+      ball.vx *=
+        Math.pow(
+          0.985,
+          dt * 60
+        )
 
       // Left wall
-      if (b.x < 0.08) {
-        b.x = 0.08
-        b.vx *= -0.75
+      if (
+        ball.x < 0.08
+      ) {
+        ball.x = 0.08
+        ball.vx *= -0.75
       }
 
       // Right wall
-      if (b.x > 0.92) {
-        b.x = 0.92
-        b.vx *= -0.75
+      if (
+        ball.x > 0.92
+      ) {
+        ball.x = 0.92
+        ball.vx *= -0.75
       }
 
-      // Ball touches ground = Game Over
-      if (b.y > 0.88) {
-        b.y = 0.88
-        b.vx = 0
-        b.vy = 0
+      // Ground = Game Over
+      if (
+        ball.y > 0.88
+      ) {
+        ball.y = 0.88
 
-        stateRef.current = 'over'
-        setState('over')
+        ball.vx = 0
+        ball.vy = 0
+
+        stateRef.current =
+          'over'
+
+        setState(
+          'over'
+        )
       }
     }
 
-    drawBall(ctx, b, w, h)
+    drawBall(
+      ctx,
+      ball,
+      w,
+      h
+    )
 
-    rafRef.current = requestAnimationFrame(draw)
+    rafRef.current =
+      requestAnimationFrame(
+        draw
+      )
   }
+
+  // --------------------------------------------------
+  // INITIALIZE
+  // --------------------------------------------------
 
   useEffect(() => {
     resizeCanvas()
@@ -444,18 +861,56 @@ export default function App() {
       resizeCanvas
     )
 
-    rafRef.current = requestAnimationFrame((t) => {
-      lastTimeRef.current = t
-      draw(t)
-    })
+    rafRef.current =
+      requestAnimationFrame(
+        (t) => {
+          lastTimeRef.current =
+            t
 
-    const onKey = (e: KeyboardEvent) => {
+          draw(t)
+        }
+      )
+
+    const onKey = (
+      e: KeyboardEvent
+    ) => {
       if (
-        e.code === 'Space' ||
-        e.code === 'ArrowUp'
+        e.code ===
+          'Space' ||
+        e.code ===
+          'ArrowUp'
       ) {
         e.preventDefault()
-        handleGameInput()
+
+        // Space does NOT start from ready.
+        // User must press PLAY first.
+        if (
+          stateRef.current ===
+          'ready'
+        ) {
+          return
+        }
+
+        // In armed state, keyboard does not
+        // start the game because we require
+        // clicking/tapping the ball.
+        if (
+          stateRef.current ===
+          'armed'
+        ) {
+          return
+        }
+
+        // During gameplay
+        if (
+          stateRef.current ===
+          'playing'
+        ) {
+          kickBall(
+            undefined,
+            true
+          )
+        }
       }
     }
 
@@ -475,27 +930,21 @@ export default function App() {
         onKey
       )
 
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
+      if (
+        rafRef.current
+      ) {
+        cancelAnimationFrame(
+          rafRef.current
+        )
       }
 
       audioRef.current?.close()
     }
-  }, [muted])
+  }, [])
 
-  const onPointerDown = (
-    e: React.PointerEvent<HTMLCanvasElement>
-  ) => {
-    e.preventDefault()
-
-    const rect =
-      e.currentTarget.getBoundingClientRect()
-
-    const inputX =
-      e.clientX - rect.left
-
-    handleGameInput(inputX)
-  }
+  // --------------------------------------------------
+  // UI
+  // --------------------------------------------------
 
   return (
     <main className="app-shell">
@@ -506,7 +955,9 @@ export default function App() {
           <button
             className="icon-btn"
             aria-label="Reset"
-            onClick={resetToReady}
+            onClick={
+              resetToReady
+            }
           >
             ↻
           </button>
@@ -517,12 +968,20 @@ export default function App() {
 
           <button
             className="icon-btn"
-            aria-label="Sound"
-            onClick={() =>
-              setMuted((v) => !v)
+            aria-label={
+              muted
+                ? 'Turn sound on'
+                : 'Turn sound off'
             }
+            onClick={() => {
+              setMuted(
+                (v) => !v
+              )
+            }}
           >
-            {muted ? '🔇' : '🔊'}
+            {muted
+              ? '🔇'
+              : '🔊'}
           </button>
 
         </header>
@@ -530,86 +989,127 @@ export default function App() {
         <div className="stats">
 
           <div>
-            <span>Current Best</span>
-            <strong>{score}</strong>
+            <span>
+              Current Best
+            </span>
+
+            <strong>
+              {score}
+            </strong>
           </div>
 
           <div>
-            <span>Highest</span>
-            <strong>{best}</strong>
+            <span>
+              Highest
+            </span>
+
+            <strong>
+              {best}
+            </strong>
           </div>
 
         </div>
 
         <canvas
           ref={canvasRef}
-          onPointerDown={onPointerDown}
+          onPointerDown={
+            onPointerDown
+          }
           className="game-canvas"
         />
 
-        <div
-          className={`overlay ${
-            state === 'playing'
-              ? 'hidden'
-              : ''
-          }`}
-        >
+        {/* ----------------------------------------
+            READY SCREEN
+        ----------------------------------------- */}
 
-          {state === 'ready' ? (
-            <>
-              <div className="ball-icon">
-                ⚽
-              </div>
+        {state === 'ready' && (
+          <div className="overlay">
 
-              <h1>
-                Keep It Up!
-              </h1>
+            <div className="ball-icon">
+              ⚽
+            </div>
 
-              <p>
-                Tap, click or press Space to
-                kick the ball.
-              </p>
+            <h1>
+              Keep It Up!
+            </h1>
 
-              <button
-                className="primary"
-                onClick={() =>
-                  startGame()
-                }
-              >
-                PLAY
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="over-icon">
-                ✦
-              </div>
+            <p>
+              Press PLAY to get ready.
+            </p>
 
-              <h1>
-                Game Over
-              </h1>
+            <button
+              className="primary"
+              onClick={
+                armGame
+              }
+            >
+              PLAY
+            </button>
 
-              <p>
-                Your score:{' '}
-                <b>{score}</b>
-              </p>
+          </div>
+        )}
 
-              <button
-                className="primary"
-                onClick={() =>
-                  startGame()
-                }
-              >
-                PLAY AGAIN
-              </button>
-            </>
-          )}
+        {/* ----------------------------------------
+            ARMED SCREEN
+            Ball is stationary.
+            Sound button remains usable.
+        ----------------------------------------- */}
 
-        </div>
+        {state === 'armed' && (
+          <div className="armed-message">
+
+            <div className="tap-hint">
+              👆
+            </div>
+
+            <strong>
+              Tap the ball to start
+            </strong>
+
+            <span>
+              The ball is ready!
+            </span>
+
+          </div>
+        )}
+
+        {/* ----------------------------------------
+            GAME OVER
+        ----------------------------------------- */}
+
+        {state === 'over' && (
+          <div className="overlay">
+
+            <div className="over-icon">
+              ✦
+            </div>
+
+            <h1>
+              Game Over
+            </h1>
+
+            <p>
+              Your score:{' '}
+              <b>
+                {score}
+              </b>
+            </p>
+
+            <button
+              className="primary"
+              onClick={
+                armGame
+              }
+            >
+              PLAY AGAIN
+            </button>
+
+          </div>
+        )}
 
         <footer>
-          Offline game • Your best score stays
-          on this device
+          Offline game • Your best score
+          stays on this device
         </footer>
 
       </section>
