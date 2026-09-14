@@ -475,6 +475,15 @@ export default function App() {
     if (
       stateRef.current === 'playing'
     ) {
+      if (
+        !isBallHit(
+          e.clientX,
+          e.clientY
+        )
+      ) {
+        return
+      }
+
       const rect =
         e.currentTarget.getBoundingClientRect()
 
