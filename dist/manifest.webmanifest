@@ -1,0 +1,19 @@
+{
+  "name": "Football Keep-Up",
+  "short_name": "Keep-Up",
+  "description": "A lightweight offline football keep-up game.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111827",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
