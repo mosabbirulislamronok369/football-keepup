@@ -15,6 +15,7 @@ type Ball = {
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const sectionRef = useRef<HTMLElement>(null)
   const rafRef = useRef<number | null>(null)
   const lastTimeRef = useRef(0)
 
@@ -40,8 +41,49 @@ export default function App() {
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(bestRef.current)
   const [muted, setMuted] = useState(true)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const audioRef = useRef<AudioContext | null>(null)
+
+  // --------------------------------------------------
+  // FULLSCREEN
+  // --------------------------------------------------
+
+  useEffect(() => {
+    const handleChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+
+      // Canvas size depends on layout, which shifts
+      // when entering/exiting fullscreen.
+      setTimeout(resizeCanvas, 50)
+    }
+
+    document.addEventListener('fullscreenchange', handleChange)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleChange)
+    }
+  }, [])
+
+  const toggleFullscreen = () => {
+    const el = sectionRef.current
+
+    if (!document.fullscreenElement) {
+      if (el?.requestFullscreen) {
+        el.requestFullscreen().catch(() => {})
+      }
+
+      const orientation = screen.orientation as any
+
+      if (orientation?.lock) {
+        orientation.lock('portrait').catch(() => {})
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {})
+      }
+    }
+  }
 
   // --------------------------------------------------
   // STATE
@@ -948,7 +990,7 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <section className="game">
+      <section className="game" ref={sectionRef}>
 
         <header className="topbar">
 
@@ -965,6 +1007,20 @@ export default function App() {
           <div className="title">
             Football Keep-Up
           </div>
+
+          <button
+            className="icon-btn"
+            aria-label={
+              isFullscreen
+                ? 'Exit fullscreen'
+                : 'Enter fullscreen'
+            }
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen
+              ? '⤢'
+              : '⛶'}
+          </button>
 
           <button
             className="icon-btn"

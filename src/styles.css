@@ -27,14 +27,22 @@ button { font: inherit; }
   background: #f4f5f7;
   touch-action: none;
 }
+.game:fullscreen,
+.game:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  max-height: none;
+  border-radius: 0;
+}
 .topbar {
   position: absolute;
   z-index: 5;
   inset: 0 0 auto;
   height: 74px;
   display: grid;
-  grid-template-columns: 64px 1fr 64px;
+  grid-template-columns: 44px 1fr 44px 44px;
   align-items: center;
+  gap: 8px;
   padding: 0 14px;
   background: rgba(255,255,255,.88);
   backdrop-filter: blur(14px);
