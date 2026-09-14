@@ -13,6 +13,24 @@ type Ball = {
   rotation: number
 }
 
+const ExpandIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 3 21 3 21 9" />
+    <polyline points="9 21 3 21 3 15" />
+    <line x1="21" y1="3" x2="14" y2="10" />
+    <line x1="3" y1="21" x2="10" y2="14" />
+  </svg>
+)
+
+const CollapseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="4 14 10 14 10 20" />
+    <polyline points="20 10 14 10 14 4" />
+    <line x1="14" y1="10" x2="21" y2="3" />
+    <line x1="3" y1="21" x2="10" y2="14" />
+  </svg>
+)
+
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sectionRef = useRef<HTMLElement>(null)
@@ -42,6 +60,7 @@ export default function App() {
   const [best, setBest] = useState(bestRef.current)
   const [muted, setMuted] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [manualFullscreen, setManualFullscreen] = useState(false)
 
   const audioRef = useRef<AudioContext | null>(null)
 
@@ -65,23 +84,44 @@ export default function App() {
     }
   }, [])
 
+  const fullscreenActive = isFullscreen || manualFullscreen
+
   const toggleFullscreen = () => {
     const el = sectionRef.current
 
-    if (!document.fullscreenElement) {
-      if (el?.requestFullscreen) {
-        el.requestFullscreen().catch(() => {})
-      }
-
-      const orientation = screen.orientation as any
-
-      if (orientation?.lock) {
-        orientation.lock('portrait').catch(() => {})
-      }
-    } else {
-      if (document.exitFullscreen) {
+    if (fullscreenActive) {
+      if (document.fullscreenElement && document.exitFullscreen) {
         document.exitFullscreen().catch(() => {})
       }
+      setManualFullscreen(false)
+      setTimeout(resizeCanvas, 50)
+      return
+    }
+
+    const orientation = screen.orientation as any
+    if (orientation?.lock) {
+      orientation.lock('portrait').catch(() => {})
+    }
+
+    if (el?.requestFullscreen) {
+      el.requestFullscreen()
+        .then(() => {
+          // Some WebViews (Android APK wrappers) resolve this promise
+          // without actually entering fullscreen. Verify shortly after.
+          setTimeout(() => {
+            if (!document.fullscreenElement) {
+              setManualFullscreen(true)
+              setTimeout(resizeCanvas, 50)
+            }
+          }, 250)
+        })
+        .catch(() => {
+          setManualFullscreen(true)
+          setTimeout(resizeCanvas, 50)
+        })
+    } else {
+      setManualFullscreen(true)
+      setTimeout(resizeCanvas, 50)
     }
   }
 
@@ -990,7 +1030,7 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <section className="game" ref={sectionRef}>
+      <section className={`game${manualFullscreen ? ' manual-fullscreen' : ''}`} ref={sectionRef}>
 
         <header className="topbar">
 
@@ -1011,15 +1051,15 @@ export default function App() {
           <button
             className="icon-btn"
             aria-label={
-              isFullscreen
+              fullscreenActive
                 ? 'Exit fullscreen'
                 : 'Enter fullscreen'
             }
             onClick={toggleFullscreen}
           >
-            {isFullscreen
-              ? '⤢'
-              : '⛶'}
+            {fullscreenActive
+              ? <CollapseIcon />
+              : <ExpandIcon />}
           </button>
 
           <button

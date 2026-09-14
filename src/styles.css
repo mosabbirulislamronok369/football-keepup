@@ -34,6 +34,15 @@ button { font: inherit; }
   max-height: none;
   border-radius: 0;
 }
+.game.manual-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  z-index: 9999;
+}
 .topbar {
   position: absolute;
   z-index: 5;
@@ -52,6 +61,7 @@ button { font: inherit; }
 .icon-btn {
   width: 44px; height: 44px; border: 0; border-radius: 14px;
   background: #eef0f3; color: #171a1f; cursor: pointer; font-size: 21px;
+  display: flex; align-items: center; justify-content: center;
 }
 .stats {
   position: absolute; z-index: 4; top: 92px; left: 0; right: 0;
