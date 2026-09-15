@@ -378,40 +378,29 @@ export default function App() {
     clientY: number
   ) => {
     const canvas = canvasRef.current
+    const ball = ballRef.current
 
-    if (!canvas) return false
+    if (!canvas || !ball) return false
 
-    const rect =
-      canvas.getBoundingClientRect()
+    const rect = canvas.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return false
 
-    const ball =
-      ballRef.current
+    // IMPORTANT: the game draws the ball using canvas.clientWidth/clientHeight
+    // (CSS pixels), so hit detection must use the exact same coordinate space.
+    const localX = clientX - rect.left
+    const localY = clientY - rect.top
 
-    const ballX =
-      rect.left +
-      ball.x * rect.width
+    const ballX = ball.x * rect.width
+    const ballY = ball.y * rect.height
 
-    const ballY =
-      rect.top +
-      ball.y * rect.height
+    const dx = localX - ballX
+    const dy = localY - ballY
+    const distance = Math.hypot(dx, dy)
 
-    const dx =
-      clientX - ballX
+    // Small tolerance only — touching elsewhere on the canvas cannot score.
+    const hitRadius = ball.radius + 8
 
-    const dy =
-      clientY - ballY
-
-    const distance =
-      Math.sqrt(
-        dx * dx +
-        dy * dy
-      )
-
-    // Slightly generous hit area
-    return (
-      distance <=
-      ball.radius + 25
-    )
+    return distance <= hitRadius
   }
 
   // --------------------------------------------------
